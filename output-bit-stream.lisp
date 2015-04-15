@@ -19,24 +19,34 @@
 
 (in-package :bit-stream)
 
-(defmethod make-output-bit-stream ()
+(defmethod make-output-bit-stream (&key (pack-order :lsb))
   "Create a new, LZW, output bit stream that bits can be written to."
   (let ((bytes (make-array 0 :element-type '(unsigned-byte 8) :adjustable t :fill-pointer t)))
-    (make-instance 'output-bit-stream :bytes bytes)))
+    (make-instance 'output-bit-stream :bytes bytes :pack-order pack-order)))
+
+(defmethod get-output-bit-stream-bytes ((stream output-bit-stream))
+  "Get the bytes from an output bit stream. Cannot be done unless closed."
+  (assert (not (open-stream-p stream)))
+  (bit-stream-bytes stream))
 
 (defmethod stream-write-bits ((stream output-bit-stream) n size)
   "Write bits (size n) to the output bit stream."
   (assert (open-stream-p stream))
-  (with-slots (bytes position bits buffer)
+  (with-slots (bytes order position bits buffer)
       stream
-    (setf buffer (dpb n (byte size bits) buffer))
+    (if (eq order :msb)
+        (setf buffer (dpb n (byte size 0) (ash buffer size)))
+      (setf buffer (dpb n (byte size bits) buffer)))
     (incf bits size)
     (do ()
         ((< bits 8) n)
-      (vector-push-extend (ldb (byte 8 0) buffer) bytes)
-      (setf buffer (ash buffer (- 8)))
-      (decf bits 8)
-      (incf position))))
+      (let ((byte (ldb (byte 8 (if (eq order :msb) (- bits 8) 0)) buffer)))
+        (vector-push-extend byte bytes)
+        (setf buffer (if (eq order :msb)
+                         (dpb 0 (byte 8 (- bits 8)) buffer)
+                       (ash buffer (- 8))))
+        (decf bits 8)
+        (incf position)))))
 
 (defmethod stream-write-byte ((stream output-bit-stream) byte)
   "Write a full byte (8 bits) to the output bit stream."

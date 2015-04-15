@@ -19,42 +19,51 @@
 
 (in-package :bit-stream)
 
-(defmethod make-input-bit-stream ((source sequence) &optional (start 0) end)
+(defmethod make-input-bit-stream ((source sequence) &key (start 0) end (pack-order :lsb))
   "Create an input bit stream from a list of bytes."
-  (make-instance 'input-bit-stream :bytes (coerce (subseq source start end) '(vector (unsigned-byte 8)))))
+  (let ((bytes (coerce (subseq source start end) '(vector (unsigned-byte 8)))))
+    (make-instance 'input-bit-stream :bytes bytes :pack-order pack-order)))
 
-(defmethod make-input-bit-stream ((source vector) &optional (start 0) end)
+(defmethod make-input-bit-stream ((source vector) &key (start 0) end (pack-order :lsb))
   "Create an input bit stream from a vector of bytes."
-  (make-instance 'input-bit-stream :bytes (coerce (subseq source start end) '(vector (unsigned-byte 8)))))
+  (let ((bytes (coerce (subseq source start end) '(vector (unsigned-byte 8)))))
+    (make-instance 'input-bit-stream :bytes bytes :pack-order pack-order)))
 
-(defmethod make-input-bit-stream ((source string) &optional (start 0) end)
+(defmethod make-input-bit-stream ((source string) &key (start 0) end (pack-order :lsb))
   "Create an input bit stream from a string of bytes."
   (let ((bytes (map '(vector (unsigned-byte 8)) #'char-code (subseq source start end))))
-    (make-instance 'input-bit-stream :bytes bytes)))
+    (make-instance 'input-bit-stream :bytes bytes :pack-order pack-order)))
 
-(defmethod make-input-bit-stream ((source stream) &optional (start (file-position source)) end)
+(defmethod make-input-bit-stream ((source stream) &key (start (file-position source)) end (pack-order :lsb))
   "Create an input bit stream from another input stream. Reads the entire source stream."
   (let* ((len (- (file-length source) (file-position source)))
          (seq (make-array len :element-type '(unsigned-byte 8) :fill-pointer t)))
     (setf (fill-pointer seq) (read-sequence seq source :start start :end end))
-    (make-instance 'input-bit-stream :bytes seq :position start)))
+    (make-instance 'input-bit-stream :bytes seq :position start :pack-order pack-order)))
 
-(defmethod make-input-bit-stream ((source pathname) &optional (start 0) end)
+(defmethod make-input-bit-stream ((source pathname) &key (start 0) end (pack-order :lsb))
   "Create an input bit stream by reading a source file off disk."
   (with-open-file (stream source :element-type '(unsigned-byte 8))
-    (make-input-bit-stream stream start end)))
+    (make-input-bit-stream stream :start start :end end :pack-order pack-order)))
 
 (defmethod stream-read-bits ((stream input-bit-stream) n)
   "Read bits from an input stream, which may read bytes."
   (assert (open-stream-p stream))
-  (with-slots (bytes position bits buffer)
+  (with-slots (bytes order position bits buffer)
       stream
+    (declare (fixnum bits buffer))
     (do ()
         ((>= bits n)
-         (prog1 (ldb (byte n 0) buffer)
-           (setf buffer (ash buffer (- n)))
+         (prog1 (if (eq order :msb)
+                    (ldb (byte n (- bits n)) buffer)
+                  (ldb (byte n 0) buffer))
+           (if (eq order :msb)
+               (dpb 0 (byte n (- bits n)) buffer)
+             (setf buffer (ash buffer (- n))))
            (decf bits n)))
-      (setf buffer (dpb (aref bytes position) (byte 8 bits) buffer))
+      (if (eq order :msb)
+          (setf buffer (dpb (aref bytes position) (byte 8 0) (ash buffer 8)))
+        (setf buffer (dpb (aref bytes position) (byte 8 bits) buffer)))
       (incf bits 8)
       (incf position))))
 
