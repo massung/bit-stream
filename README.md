@@ -85,7 +85,7 @@ The first 3 bits should be 001 (1), followed by 110 (6), followed by 000 (0), 01
 
 There are two helper macros for working with input and output bit-streams:
 
-	(with-input-bit-stream (stream-var source) &body body)
-	(with-output-bit-stream (stream-var) &body body)
+	(with-input-bit-stream (stream-var source &key pack-order) &body body)
+	(with-output-bit-stream (stream-var &key pack-order) &body body)
 
 These will create the stream, execute the body, and ensure that the stream is closed properly. The return value for the `output-bit-stream` will be the byte vector written.
