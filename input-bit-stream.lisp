@@ -85,7 +85,7 @@
     (- (* position 8) bits)))
 
 (defmethod (setf stream-file-position) (position-spec (stream input-bit-stream))
-  "Change the current position of the stream."
+  "Change the current bit position of the stream."
   (with-slots (bytes position bits buffer)
       stream
     (when (< position-spec (* (length bytes) 8))

@@ -66,6 +66,10 @@
   "Required type of bit streams."
   '(unsigned-byte 8))
 
+(defmethod file-length ((stream bit-stream))
+  "Return the length of the bit stream in bits."
+  (* (length (bit-stream-bytes stream)) 8))
+
 (defmacro with-input-bit-stream ((stream-var source &key (pack-order :lsb)) &body body)
   "Create an input bit stream, popuplate it with the source, run a body of code."
   `(let ((,stream-var (make-input-bit-stream ,source :pack-order ,pack-order)))
